@@ -52,7 +52,7 @@ $persons = $stmt->fetchAll(PDO::FETCH_ASSOC);
             border-radius: 4px;
         }
         .actions a:hover {
-            background-color: #31b0d5;
+            background-color: #5D7D39;
         }
         .container {
             max-width: 1000px;
@@ -70,7 +70,7 @@ $persons = $stmt->fetchAll(PDO::FETCH_ASSOC);
             margin: 10px 0;
         }
         .button:hover {
-            background-color: #31b0d5;
+            background-color: #5D7D39;
         }
     </style>
 </head>

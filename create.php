@@ -128,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             cursor: pointer;
         }
         .button:hover {
-            background-color: #31b0d5;
+            background-color: #5D7D39;
         }
         a {
             display: inline-block;

@@ -1,0 +1,12 @@
+[login] 101 => mysql -h mnc353.encs.concordia.ca -u mnc353_1 -p mnc353_1
+Enter password: f3h6rEF0
+
+ /groups/m/mn_comp353_1       This directory is where you should cd into
+                               and use while working on the project.
+                               It is *NOT* available on the web server!
+
+
+  /www/groups/m/mn_comp353_1   This is the directory where you should place
+                               *ALL* the files to be viewable on the web.
+
+https://mnc353.encs.concordia.ca/index.php

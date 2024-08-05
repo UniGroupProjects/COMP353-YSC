@@ -17,37 +17,6 @@ $personData = [
     'dateOfBirth' => ''
 ];
 
-// Fetch the person details if ID is provided
-if (isset($_GET['id'])) {
-    $id = intval($_GET['id']);
-    $stmt = $pdo->prepare("SELECT * FROM Person WHERE personID = ?");
-    $stmt->execute([$id]);
-    $person = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$person) {
-        die('Person not found');
-    }
-
-    // Populate form data
-    $personData = [
-        'firstName' => $person['firstName'],
-        'lastName' => $person['lastName'],
-        'email' => $person['email'],
-        'phone' => $person['phone'],
-        'gender' => $person['gender'],
-        'SSN' => $person['SSN'],
-        'medicareID' => $person['medicareID'],
-        'address' => $person['address'],
-        'city' => $person['city'],
-        'province' => $person['province'],
-        'postalCode' => $person['postalCode'],
-        'dateOfBirth' => $person['dateOfBirth']
-    ];
-} else {
-    die('Invalid ID');
-}
-
-// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validation
     if (empty($_POST['firstName'])) {
@@ -79,9 +48,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'dateOfBirth' => $_POST['dateOfBirth']
     ];
 
-    // If no errors, update data in the database
+    // If no errors, insert data into the database
     if (empty($errors)) {
-        $stmt = $pdo->prepare("UPDATE Person SET firstName = ?, lastName = ?, email = ?, phone = ?, gender = ?, SSN = ?, medicareID = ?, address = ?, city = ?, province = ?, postalCode = ?, dateOfBirth = ? WHERE personID = ?");
+        $stmt = $pdo->prepare("INSERT INTO Person (firstName, lastName, email, phone, gender, SSN, medicareID, address, city, province, postalCode, dateOfBirth) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $personData['firstName'],
             $personData['lastName'],
@@ -94,8 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $personData['city'],
             $personData['province'],
             $personData['postalCode'],
-            $personData['dateOfBirth'],
-            $id
+            $personData['dateOfBirth']
         ]);
         header('Location: index.php');
         exit;
@@ -106,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Edit Person</title>
+    <title>Add Person</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -174,8 +142,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body>
-    <h1>Edit Person</h1>
-    <form action="edit.php?id=<?php echo htmlspecialchars($id); ?>" method="post">
+    <h1>Add New Person</h1>
+    <form action="create_person.php" method="post">
         <div class="form-group">
             <label for="firstName">First Name:</label>
             <input type="text" id="firstName" name="firstName" value="<?php echo htmlspecialchars($personData['firstName']); ?>">
@@ -243,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <span class="error"><?php echo isset($errors['dateOfBirth']) ? htmlspecialchars($errors['dateOfBirth']) : ''; ?></span>
         </div>
 
-        <input type="submit" class="button" value="Update Person">
+        <input type="submit" class="button" value="Add Person">
     </form>
     <a href="index.php">Back to List</a>
 </body>

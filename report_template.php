@@ -143,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
     <h1>Add New Person</h1>
-    <form action="create.php" method="post">
+    <form action="create_person.php" method="post">
         <div class="form-group">
             <label for="firstName">First Name:</label>
             <input type="text" id="firstName" name="firstName" value="<?php echo htmlspecialchars($personData['firstName']); ?>">

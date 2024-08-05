@@ -10,3 +10,6 @@ Enter password: f3h6rEF0
                                *ALL* the files to be viewable on the web.
 
 https://mnc353.encs.concordia.ca/index.php
+
+The User ID  for web access is mnc353_1
+The password for web access is f3h6rEF0

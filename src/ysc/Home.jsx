@@ -9,7 +9,7 @@ function Home() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('http://localhost:3035'); // Replace with your server endpoint
+      const res = await fetch('https://ysc-server-87f818a8cc41.herokuapp.com'); // Replace with your server endpoint
       if (!res.ok) {
         throw new Error('Network response was not ok');
       }

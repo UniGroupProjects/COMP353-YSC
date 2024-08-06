@@ -11,10 +11,12 @@ $persons = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt = $pdo->query("SELECT * FROM Location");
 $locations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch all personnel from the database
-$stmt = $pdo->query("SELECT p.personID, CONCAT(p.firstName, ' ', p.lastName) AS personName, pe.personnelID, pe.role, pe.mandate, pe.activationDate, pe.terminationDate 
+// Fetch all personnel from the database, join with location and get only the active location if any
+$stmt = $pdo->query("SELECT p.personID, CONCAT(p.firstName, ' ', p.lastName) AS personName, pe.personnelID, pe.role, pe.mandate, pe.activationDate, pe.terminationDate, l.name as locationName
                      FROM Personnel pe
-                     JOIN Person p ON pe.personID = p.personID");
+                     JOIN Person p ON pe.personID = p.personID
+                     LEFT JOIN (SELECT * FROM PersonnelLocation pl WHERE pl.terminationDate is null) as pl ON pe.personnelID=pl.personnelID
+                     LEFT JOIN Location l ON pl.locationID=l.locationID");
 $personnel = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch all club members from the database
@@ -484,6 +486,7 @@ $report16 = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <th>Mandate</th>
                         <th>Activation Date</th>
                         <th>Termination Date</th>
+                        <th>Current Location</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -496,6 +499,7 @@ $report16 = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <td><?php echo htmlspecialchars($person['mandate']); ?></td>
                                 <td><?php echo htmlspecialchars($person['activationDate']); ?></td>
                                 <td><?php echo htmlspecialchars($person['terminationDate'] ? $person['terminationDate'] : 'N/A'); ?>
+                                <td><?php echo htmlspecialchars($person['locationName'] ? $person['locationName'] : 'N/A'); ?>
                                 </td>
                                 <td class="actions">
                                     <?php if (is_null($person['terminationDate'])): ?>

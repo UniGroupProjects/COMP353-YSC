@@ -185,8 +185,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         <div class="form-group">
             <label for="relType">Relationship Type:</label>
-            <input type="text" name="relType" id="relType"
-                value="<?php echo isset($relType) ? htmlspecialchars($relType) : ''; ?>" required>
+            <select name="relType" id="relType" required>
+                <option value="">Select Relationship Type</option>
+                <option value="Father" <?php echo isset($relType) && $relType === 'Father' ? 'selected' : ''; ?>>Father
+                </option>
+                <option value="Mother" <?php echo isset($relType) && $relType === 'Mother' ? 'selected' : ''; ?>>Mother
+                </option>
+                <option value="GrandFather" <?php echo isset($relType) && $relType === 'GrandFather' ? 'selected' : ''; ?>>GrandFather</option>
+                <option value="GrandMother" <?php echo isset($relType) && $relType === 'GrandMother' ? 'selected' : ''; ?>>GrandMother</option>
+                <option value="Tutor" <?php echo isset($relType) && $relType === 'Tutor' ? 'selected' : ''; ?>>Tutor
+                </option>
+                <option value="Partner" <?php echo isset($relType) && $relType === 'Partner' ? 'selected' : ''; ?>>Partner
+                </option>
+                <option value="Friend" <?php echo isset($relType) && $relType === 'Friend' ? 'selected' : ''; ?>>Friend
+                </option>
+                <option value="Other" <?php echo isset($relType) && $relType === 'Other' ? 'selected' : ''; ?>>Other
+                </option>
+            </select>
             <span
                 class="error"><?php echo isset($errors['relType']) ? htmlspecialchars($errors['relType']) : ''; ?></span>
         </div>

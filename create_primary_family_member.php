@@ -1,12 +1,29 @@
 <?php
 include 'config.php';
 
-// Fetch all persons from the database
-$stmt = $pdo->query("SELECT personID, CONCAT(firstName, ' ', lastName) AS personName FROM Person");
+$errors = [];
+$familyData = [
+    'locationID' => null,
+];
+
+// Fetch all persons from the database who are not already family members
+$stmt = $pdo->query("
+SELECT personID, CONCAT(P.firstName, ' ', P.lastName) AS personName
+FROM
+    Person P
+WHERE P.personID NOT IN (
+    SELECT personID
+    FROM FamilyMember
+);");
 $persons = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch locations for dropdown
+$locStmt = $pdo->query("SELECT locationID, CONCAT(name, ' : ', address, ' : ', type) AS locName FROM Location");
+$locations = $locStmt->fetchAll(PDO::FETCH_ASSOC);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $personID = $_POST['personID'];
+    $locationID = $familyData['locationID'];
 
     // Prepare and execute the insert statement
     $stmt = $pdo->prepare("INSERT INTO FamilyMember (personID) VALUES (:personID)");
@@ -126,6 +143,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </option>
             <?php endforeach; ?>
         </select>
+
+        <div class="form-group">
+            <label for="locationID">Location:</label>
+            <select id="locationID" name="locationID">
+                <option value="">Select a location</option>
+                <?php foreach ($locations as $location): ?>
+                    <option value="<?php echo htmlspecialchars($location['locationID']); ?>" <?php echo $location['locationID'] === $familyData['locationID'] ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($location['locName']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <span
+                class="error"><?php echo isset($errors['locationName']) ? htmlspecialchars($errors['locationName']) : ''; ?></span>
+        </div>
 
         <input type="submit" class="button" value="Add Family Member">
     </form>

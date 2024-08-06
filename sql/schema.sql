@@ -96,7 +96,8 @@ CREATE TABLE EmergencyContact (
     familyMemberID INT UNIQUE NOT NULL,
     firstName VARCHAR(50) NOT NULL,
     lastName VARCHAR(50) NOT NULL,
-    relType VARCHAR(50) NOT NULL,
+    relType ENUM('Father', 'Mother', 'GrandFather', 'GrandMother', 'Tutor', 'Partner',
+'Friend', 'Other') NOT NULL,
     phone VARCHAR(20) NOT NULL,
     PRIMARY KEY (familyMemberID, phone),
     FOREIGN KEY (familyMemberID) REFERENCES FamilyMember(familyMemberID) ON DELETE CASCADE

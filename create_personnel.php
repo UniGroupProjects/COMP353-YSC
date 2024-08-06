@@ -3,11 +3,11 @@ include 'config.php';
 
 $errors = [];
 $personnelData = [
-    'personID' => '',
+    'personID' => null,
     'role' => 'Administrator',
     'mandate' => 'Volunteer',
-    'activationDate' => date('Y-m-d'),
-    'terminationDate' => null,
+    'locationID' => null,
+    'isManager' => false,
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($_POST['personID'])) {
         $errors['personID'] = 'Person ID is required.';
     }
-    if (empty($_POST['role'])) {
+    if (empty($_POST['role']) && empty($_POST['hiddenRole'])) {
         $errors['role'] = 'Role is required.';
     }
     if (empty($_POST['mandate'])) {
@@ -25,15 +25,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Collect data
     $personnelData = [
         'personID' => $_POST['personID'],
-        'role' => $_POST['role'],
+        'role' => empty($_POST['role']) ? $_POST['hiddenRole'] : $_POST['role'],
         'mandate' => $_POST['mandate'],
-        'activationDate' => $_POST['activationDate'],
-        'terminationDate' => null
+        'locationID' => $_POST['locationID'],
+        'isManager' => $_POST['isManager'],
     ];
 
     // If no errors, insert data into the database
     if (empty($errors)) {
-        $sql = "INSERT INTO Personnel (personID, role, mandate, activationDate, terminationDate) VALUES (?, ?, ?, ?, ?)";
+
+        //Start a transaction, and rollback everything in case of errors
+        $pdo->beginTransaction();
+
+        //Personnel entry
+        $sql = "INSERT INTO Personnel (personID, role, mandate, activationDate, terminationDate) VALUES (?, ?, ?, CURDATE(), null)";
         $stmt = $pdo->prepare($sql);
 
         try {
@@ -41,19 +46,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $personnelData['personID'],
                 $personnelData['role'],
                 $personnelData['mandate'],
-                $personnelData['activationDate'],
-                $personnelData['terminationDate']
             ]);
-            header("Location: index.php");
         } catch (PDOException $e) {
             $errors['database'] = "Error: " . $e->getMessage();
+            $pdo->rollBack();
+            exit;
+        }
+
+        $personnelID = $pdo->lastInsertId();
+
+        //PersonnelLocation entry
+        if (!empty($_POST['locationID'])) {
+
+            $sql = "INSERT INTO PersonnelLocation (personnelID, locationID, activationDate) VALUES (?, ?, CURDATE())";
+            $stmt = $pdo->prepare($sql);
+
+            try {
+                $stmt->execute([
+                    $personnelID,
+                    $_POST['locationID']
+                ]);
+            } catch (PDOException $e) {
+                $errors['database'] = "Error: " . $e->getMessage();
+                $pdo->rollBack();
+                exit;
+            }
+        }
+
+        //Manager entry
+        if (!empty($_POST['locationID']) && !empty($_POST['isManager']) && $_POST['isManager'] == true) {
+            $sql = "INSERT INTO ManagerLocation (personnelID, locationID, activationDate) VALUES (?, ?, CURDATE())";
+            $stmt = $pdo->prepare($sql);
+
+            try {
+                $stmt->execute([
+                    $personnelID,
+                    $_POST['locationID']
+                ]);
+            } catch (PDOException $e) {
+                $errors['database'] = "Error: " . $e->getMessage();
+                $pdo->rollBack();
+                exit;
+            }
+        }
+
+        if (empty($errors)) {
+            $pdo->commit();
+            header("Location: index.php");
         }
     }
 }
 
-// Fetch persons for dropdown
-$personStmt = $pdo->query("SELECT personID, CONCAT(firstName, ' ', lastName) AS fullName FROM Person");
+// Fetch persons for dropdown - only those not active 
+$personStmt = $pdo->query("
+SELECT personID, CONCAT(P.firstName, ' ', P.lastName) AS fullName
+FROM
+    Person P
+WHERE P.personID NOT IN (
+    SELECT personID
+    FROM Personnel
+);");
 $persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch locations for dropdown
+$locStmt = $pdo->query("SELECT locationID, CONCAT(name, ' : ', address, ' : ', type) AS locName FROM Location");
+$locations = $locStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch location managers
+$managerStmt = $pdo->query("
+SELECT L.locationID, CONCAT(P.firstName, ' ', P.lastName) AS generalManagerName
+FROM
+    Location L 
+    JOIN ManagerLocation ML on L.locationID = ML.locationID
+    JOIN Personnel PE ON ML.personnelID = PE.personnelID
+    JOIN Person P ON PE.personID = P.personID
+WHERE 
+    PE.role = 'Administrator' AND ML.terminationDate is null");
+$managers = $managerStmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -138,6 +207,45 @@ $persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
         a:hover {
             text-decoration: underline;
         }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin: 10px;
+        }
+
+        .styled-checkbox {
+            position: absolute;
+            opacity: 0;
+        }
+
+        .styled-checkbox+.checkbox-label {
+            position: relative;
+            cursor: pointer;
+            padding-left: 25px;
+        }
+
+        .styled-checkbox+.checkbox-label:before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #ccc;
+            border-radius: 3px;
+            background: white;
+        }
+
+        .styled-checkbox:checked+.checkbox-label:before {
+            content: '\2714';
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            background-color: #007bff;
+            border: none;
+        }
     </style>
 </head>
 
@@ -168,6 +276,20 @@ $persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
         <div class="form-group">
+            <label for="locationID">Location:</label>
+            <select id="locationID" name="locationID">
+                <option value="">Select a location</option>
+                <?php foreach ($locations as $location): ?>
+                    <option value="<?php echo htmlspecialchars($location['locationID']); ?>" <?php echo $location['locationID'] === $personnelData['locationID'] ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($location['locName']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <span
+                class="error"><?php echo isset($errors['locationName']) ? htmlspecialchars($errors['locationName']) : ''; ?></span>
+        </div>
+
+        <div class="form-group">
             <label for="role">Role:</label>
             <select id="role" name="role">
                 <option value="Administrator" <?php echo $personnelData['role'] === 'Administrator' ? 'selected' : ''; ?>>
@@ -191,16 +313,63 @@ $persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
                 class="error"><?php echo isset($errors['mandate']) ? htmlspecialchars($errors['mandate']) : ''; ?></span>
         </div>
 
-        <div class="form-group">
-            <label for="activationDate">Activation Date:</label>
-            <input type="date" id="activationDate" name="activationDate"
-                value="<?php echo htmlspecialchars($personnelData['activationDate']); ?>">
-            <span
-                class="error"><?php echo isset($errors['activationDate']) ? htmlspecialchars($errors['activationDate']) : ''; ?></span>
+        <div class="checkbox-container">
+            <input type="checkbox" id="isManager" name="isManager" class="styled-checkbox">
+            <label for="isManager" class="checkbox-label">Manager of Location</label>
         </div>
+        <span id="managerName" class="manager-name" style="{margin: 15px}"></span>
+        <input type="hidden" id="hiddenRole" name="hiddenRole" value="">
 
         <input type="submit" class="button" value="Create Personnel">
     </form>
+
+    <script>
+        // Fetch managers data from PHP and parse it to JavaScript
+        const managers = <?php echo json_encode($managers); ?>;
+
+        document.getElementById('locationID').addEventListener('change', function () {
+            const locationID = this.value;
+            const isManagerCheckbox = document.getElementById('isManager');
+            const checkboxContainer = isManagerCheckbox.parentElement;
+            const managerNameSpan = document.getElementById('managerName');
+
+            // Find the manager for the selected location
+            const manager = managers.find(m => m.locationID == locationID);
+
+            if (manager) {
+                // If a manager exists, hide the checkbox and display the manager's name
+                checkboxContainer.style.display = 'none';
+                managerNameSpan.textContent = 'Current Manager: ' + manager.generalManagerName;
+                managerNameSpan.style.display = 'block'; // Ensure the span is visible
+            } else {
+                // If no manager exists, show the checkbox and clear the manager's name
+                checkboxContainer.style.display = 'block';
+                managerNameSpan.textContent = '';
+                managerNameSpan.style.display = 'none'; // Hide the span
+            }
+        });
+    </script>
+
+    <script>
+        document.getElementById('isManager').addEventListener('change', function () {
+            const isChecked = this.checked;
+            const roleDropdown = document.getElementById('role'); // Ensure the role dropdown has this id
+            const hiddenRoleInput = document.getElementById('hiddenRole'); // Hidden input field for role
+
+            if (isChecked) {
+                // If the checkbox is checked, set the role dropdown to 'Administrator' and disable it
+                roleDropdown.value = 'Administrator'; // Set to 'Administrator'
+                hiddenRoleInput.value = 'Administrator';
+                roleDropdown.disabled = true; // Make dropdown unchangeable
+            } else {
+                // If the checkbox is unchecked, allow the role dropdown to be changed
+                roleDropdown.disabled = false; // Make dropdown changeable
+            }
+        });
+    </script>
+
+
+
     <a href="index.php">Back to List</a>
 </body>
 

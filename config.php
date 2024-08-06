@@ -10,4 +10,9 @@ try {
 } catch (PDOException $e) {
     die("Could not connect to the database $db :" . $e->getMessage());
 }
+
+function phpAlert($message)
+{
+    echo "<script type='text/javascript'>alert('$message');</script>";
+}
 ?>

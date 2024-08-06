@@ -35,22 +35,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($errors)) {
         // Prepare and execute the insert statement
         $stmt = $pdo->prepare("INSERT INTO EmergencyContact (familyMemberID, firstName, lastName, relType, phone) VALUES (:familyMemberID, :firstName, :lastName, :relType, :phone)");
-        $stmt->execute([
-            'familyMemberID' => $familyMemberID,
-            'firstName' => $firstName,
-            'lastName' => $lastName,
-            'relType' => $relType,
-            'phone' => $phone
-        ]);
 
-        header("Location: index.php");  // Redirect to the main page after insertion
-        exit();
+        try {
+            $stmt->execute([
+                'familyMemberID' => $familyMemberID,
+                'firstName' => $firstName,
+                'lastName' => $lastName,
+                'relType' => $relType,
+                'phone' => $phone
+            ]);
+
+            $success = "Club member added successfully!";
+            header("Location: index.php");  // Redirect to the main page after insertion
+        } catch (PDOException $e) {
+            $errors['database'] = "Error: " . $e->getMessage();
+        }
     }
 }
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -111,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         .button {
             padding: 10px 20px;
-            background-color: #5bc0de;
+            background-color: #80AD4E;
             color: #fff;
             border: none;
             border-radius: 4px;
@@ -119,14 +125,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         .button:hover {
-            background-color: #31b0d5;
+            background-color: #5D7D39;
         }
 
         a {
             display: inline-block;
             margin-top: 20px;
             text-decoration: none;
-            color: #5bc0de;
+            color: #80AD4E;
         }
 
         a:hover {
@@ -134,8 +140,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     </style>
 </head>
+
 <body>
     <h1>Add Emergency Contact</h1>
+    <?php if (!empty($errors)): ?>
+        <div class="error">
+            <?php foreach ($errors as $error): ?>
+                <p><?php echo htmlspecialchars($error); ?></p>
+            <?php endforeach; ?>
+        </div>
+    <?php elseif (!empty($success)): ?>
+        <div class="success"><?php echo htmlspecialchars($success); ?></div>
+    <?php endif; ?>
     <form method="POST">
         <div class="form-group">
             <label for="familyMemberID">Family Member:</label>
@@ -147,30 +163,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </option>
                 <?php endforeach; ?>
             </select>
-            <span class="error"><?php echo isset($errors['familyMemberID']) ? htmlspecialchars($errors['familyMemberID']) : ''; ?></span>
+            <span
+                class="error"><?php echo isset($errors['familyMemberID']) ? htmlspecialchars($errors['familyMemberID']) : ''; ?></span>
         </div>
 
         <div class="form-group">
             <label for="firstName">First Name:</label>
-            <input type="text" name="firstName" id="firstName" value="<?php echo isset($firstName) ? htmlspecialchars($firstName) : ''; ?>" required>
-            <span class="error"><?php echo isset($errors['firstName']) ? htmlspecialchars($errors['firstName']) : ''; ?></span>
+            <input type="text" name="firstName" id="firstName"
+                value="<?php echo isset($firstName) ? htmlspecialchars($firstName) : ''; ?>" required>
+            <span
+                class="error"><?php echo isset($errors['firstName']) ? htmlspecialchars($errors['firstName']) : ''; ?></span>
         </div>
 
         <div class="form-group">
             <label for="lastName">Last Name:</label>
-            <input type="text" name="lastName" id="lastName" value="<?php echo isset($lastName) ? htmlspecialchars($lastName) : ''; ?>" required>
-            <span class="error"><?php echo isset($errors['lastName']) ? htmlspecialchars($errors['lastName']) : ''; ?></span>
+            <input type="text" name="lastName" id="lastName"
+                value="<?php echo isset($lastName) ? htmlspecialchars($lastName) : ''; ?>" required>
+            <span
+                class="error"><?php echo isset($errors['lastName']) ? htmlspecialchars($errors['lastName']) : ''; ?></span>
         </div>
 
         <div class="form-group">
             <label for="relType">Relationship Type:</label>
-            <input type="text" name="relType" id="relType" value="<?php echo isset($relType) ? htmlspecialchars($relType) : ''; ?>" required>
-            <span class="error"><?php echo isset($errors['relType']) ? htmlspecialchars($errors['relType']) : ''; ?></span>
+            <input type="text" name="relType" id="relType"
+                value="<?php echo isset($relType) ? htmlspecialchars($relType) : ''; ?>" required>
+            <span
+                class="error"><?php echo isset($errors['relType']) ? htmlspecialchars($errors['relType']) : ''; ?></span>
         </div>
 
         <div class="form-group">
             <label for="phone">Phone:</label>
-            <input type="text" name="phone" id="phone" value="<?php echo isset($phone) ? htmlspecialchars($phone) : ''; ?>" required>
+            <input type="text" name="phone" id="phone"
+                value="<?php echo isset($phone) ? htmlspecialchars($phone) : ''; ?>" required>
             <span class="error"><?php echo isset($errors['phone']) ? htmlspecialchars($errors['phone']) : ''; ?></span>
         </div>
 
@@ -178,4 +202,5 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </form>
     <a href="index.php">Back to List</a>
 </body>
+
 </html>

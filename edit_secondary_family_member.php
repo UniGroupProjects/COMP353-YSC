@@ -7,17 +7,18 @@ $familyMembers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $errors = [];
 
+$familyMemberID = $_GET['id'];
+$stmt = $pdo->prepare("SELECT * FROM EmergencyContact WHERE familyMemberID = :familyMemberID");
+$stmt->execute([':familyMemberID' => $familyMemberID]);
+$emergencyContact = $stmt->fetch(PDO::FETCH_ASSOC);
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $familyMemberID = $_POST['familyMemberID'];
     $firstName = trim($_POST['firstName']);
     $lastName = trim($_POST['lastName']);
     $relType = trim($_POST['relType']);
     $phone = trim($_POST['phone']);
 
     // Validate input fields
-    if (empty($familyMemberID)) {
-        $errors['familyMemberID'] = 'Family member is required.';
-    }
     if (empty($firstName)) {
         $errors['firstName'] = 'First name is required.';
     }
@@ -35,22 +36,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($errors)) {
         // Prepare and execute the update statement
         $stmt = $pdo->prepare("UPDATE EmergencyContact SET firstName = :firstName, lastName = :lastName, relType = :relType, phone = :phone WHERE familyMemberID = :familyMemberID");
-        $stmt->execute([
-            'firstName' => $firstName,
-            'lastName' => $lastName,
-            'relType' => $relType,
-            'phone' => $phone,
-            'familyMemberID' => $familyMemberID,
-        ]);
 
-        header("Location: index.php");  // Redirect to the main page after updating
-        exit();
+        try {
+            $stmt->execute([
+                'firstName' => $firstName,
+                'lastName' => $lastName,
+                'relType' => $relType,
+                'phone' => $phone,
+                'familyMemberID' => $familyMemberID,
+            ]);
+            header("Location: index.php");  // Redirect to the main page after insertion
+        } catch (PDOException $e) {
+            $errors['database'] = "Error: " . $e->getMessage();
+        }
     }
-} elseif (isset($_GET['id'])) {
-    $familyMemberID = $_GET['id'];
-    $stmt = $pdo->prepare("SELECT * FROM EmergencyContact WHERE familyMemberID = :familyMemberID");
-    $stmt->execute([':familyMemberID' => $familyMemberID]);
-    $emergencyContact = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 ?>
 
@@ -117,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         .button {
             padding: 10px 20px;
-            background-color: #5bc0de;
+            background-color: #80AD4E;
             color: #fff;
             border: none;
             border-radius: 4px;
@@ -125,14 +124,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         .button:hover {
-            background-color: #31b0d5;
+            background-color: #5D7D39;
         }
 
         a {
             display: inline-block;
             margin-top: 20px;
             text-decoration: none;
-            color: #5bc0de;
+            color: #80AD4E;
         }
 
         a:hover {
@@ -152,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             <div class="form-group">
                 <label for="familyMemberID">Family Member:</label>
-                <select name="familyMemberID" id="familyMemberID" required disabled>
+                <select name="familyMemberID" disabled>
                     <option value="">Select a family member</option>
                     <?php foreach ($familyMembers as $member): ?>
                         <option value="<?php echo htmlspecialchars($member['familyMemberID']); ?>" <?php echo (isset($familyMemberID) && $familyMemberID == $member['familyMemberID']) ? 'selected' : ''; ?>>
@@ -160,30 +159,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <span class="error"><?php echo isset($errors['familyMemberID']) ? htmlspecialchars($errors['familyMemberID']) : ''; ?></span>
+                <span
+                    class="error"><?php echo isset($errors['familyMemberID']) ? htmlspecialchars($errors['familyMemberID']) : ''; ?></span>
             </div>
 
             <div class="form-group">
                 <label for="firstName">First Name:</label>
-                <input type="text" name="firstName" id="firstName" value="<?php echo isset($emergencyContact['firstName']) ? htmlspecialchars($emergencyContact['firstName']) : ''; ?>" required>
-                <span class="error"><?php echo isset($errors['firstName']) ? htmlspecialchars($errors['firstName']) : ''; ?></span>
+                <input type="text" name="firstName" id="firstName"
+                    value="<?php echo isset($emergencyContact['firstName']) ? htmlspecialchars($emergencyContact['firstName']) : ''; ?>"
+                    required>
+                <span
+                    class="error"><?php echo isset($errors['firstName']) ? htmlspecialchars($errors['firstName']) : ''; ?></span>
             </div>
 
             <div class="form-group">
                 <label for="lastName">Last Name:</label>
-                <input type="text" name="lastName" id="lastName" value="<?php echo isset($emergencyContact['lastName']) ? htmlspecialchars($emergencyContact['lastName']) : ''; ?>" required>
-                <span class="error"><?php echo isset($errors['lastName']) ? htmlspecialchars($errors['lastName']) : ''; ?></span>
+                <input type="text" name="lastName" id="lastName"
+                    value="<?php echo isset($emergencyContact['lastName']) ? htmlspecialchars($emergencyContact['lastName']) : ''; ?>"
+                    required>
+                <span
+                    class="error"><?php echo isset($errors['lastName']) ? htmlspecialchars($errors['lastName']) : ''; ?></span>
             </div>
 
             <div class="form-group">
                 <label for="relType">Relationship Type:</label>
-                <input type="text" name="relType" id="relType" value="<?php echo isset($emergencyContact['relType']) ? htmlspecialchars($emergencyContact['relType']) : ''; ?>" required>
-                <span class="error"><?php echo isset($errors['relType']) ? htmlspecialchars($errors['relType']) : ''; ?></span>
+                <input type="text" name="relType" id="relType"
+                    value="<?php echo isset($emergencyContact['relType']) ? htmlspecialchars($emergencyContact['relType']) : ''; ?>"
+                    required>
+                <span
+                    class="error"><?php echo isset($errors['relType']) ? htmlspecialchars($errors['relType']) : ''; ?></span>
             </div>
 
             <div class="form-group">
                 <label for="phone">Phone:</label>
-                <input type="text" name="phone" id="phone" value="<?php echo isset($emergencyContact['phone']) ? htmlspecialchars($emergencyContact['phone']) : ''; ?>" required>
+                <input type="text" name="phone" id="phone"
+                    value="<?php echo isset($emergencyContact['phone']) ? htmlspecialchars($emergencyContact['phone']) : ''; ?>"
+                    required>
                 <span class="error"><?php echo isset($errors['phone']) ? htmlspecialchars($errors['phone']) : ''; ?></span>
             </div>
 

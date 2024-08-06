@@ -11,7 +11,7 @@ $persons = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt = $pdo->query("SELECT * FROM Location");
 $locations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch all locations from the database
+// Fetch all personnel from the database
 $stmt = $pdo->query("SELECT p.personID, CONCAT(p.firstName, ' ', p.lastName) AS personName, pe.personnelID, pe.role, pe.mandate, pe.activationDate, pe.terminationDate 
                      FROM Personnel pe
                      JOIN Person p ON pe.personID = p.personID");

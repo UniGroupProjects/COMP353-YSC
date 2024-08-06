@@ -101,7 +101,7 @@ $persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
 
         .button {
             padding: 10px 20px;
-            background-color: #5bc0de;
+            background-color: #80AD4E;
             color: #fff;
             border: none;
             border-radius: 4px;
@@ -109,14 +109,14 @@ $persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
         .button:hover {
-            background-color: #31b0d5;
+            background-color: #5D7D39;
         }
 
         a {
             display: inline-block;
             margin-top: 20px;
             text-decoration: none;
-            color: #5bc0de;
+            color: #80AD4E;
         }
 
         a:hover {

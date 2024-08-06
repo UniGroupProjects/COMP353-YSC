@@ -26,10 +26,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // Update the family member record
     $stmt = $pdo->prepare("UPDATE FamilyMember SET personID = :personID WHERE familyMemberID = :familyMemberID");
-    $stmt->execute(['personID' => $newPersonID, 'familyMemberID' => $familyMemberID]);
 
-    header("Location: index.php");  // Redirect to the main page after update
-    exit();
+    try {
+        $stmt->execute(['personID' => $newPersonID, 'familyMemberID' => $familyMemberID]);
+        header("Location: index.php");  // Redirect to the main page after insertion
+    } catch (PDOException $e) {
+        $errors['database'] = "Error: " . $e->getMessage();
+    }
 }
 ?>
 
@@ -62,7 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             margin: 10px 0 5px;
         }
 
-        input, select {
+        input,
+        select {
             width: 100%;
             padding: 8px;
             margin-bottom: 10px;
@@ -92,18 +96,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <body>
     <h1>Edit Family Member</h1>
+    <?php if (!empty($errors)): ?>
+        <div class="error">
+            <?php foreach ($errors as $error): ?>
+                <p><?php echo htmlspecialchars($error); ?></p>
+            <?php endforeach; ?>
+        </div>
+    <?php elseif (!empty($success)): ?>
+        <div class="success"><?php echo htmlspecialchars($success); ?></div>
+    <?php endif; ?>
     <form method="POST">
         <label for="personID">Person:</label>
         <select name="personID" id="personID" required>
             <option value="">Select a person</option>
             <?php foreach ($persons as $person): ?>
-                <option value="<?php echo htmlspecialchars($person['personID']); ?>"
-                    <?php if ($person['personID'] == $familyMember['personID']) echo 'selected'; ?>>
-                    <?php echo htmlspecialchars($person['personName']); ?>
+                <option value="<?php echo htmlspecialchars($person['personID']); ?>" <?php echo ($person['personID'] == $familyMember['personID']) ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars($person['fullName']); ?>
                 </option>
             <?php endforeach; ?>
-        </select>
 
+        </select>
         <button type="submit">Update Family Member</button>
     </form>
 </body>

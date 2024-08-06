@@ -35,15 +35,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($errors)) {
         $sql = "INSERT INTO Personnel (personID, role, mandate, activationDate, terminationDate) VALUES (?, ?, ?, ?, ?)";
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            $personnelData['personID'],
-            $personnelData['role'],
-            $personnelData['mandate'],
-            $personnelData['activationDate'],
-            $personnelData['terminationDate']
-        ]);
-        header('Location: index.php');
-        exit;
+
+        try {
+            $stmt->execute([
+                $personnelData['personID'],
+                $personnelData['role'],
+                $personnelData['mandate'],
+                $personnelData['activationDate'],
+                $personnelData['terminationDate']
+            ]);
+            header("Location: index.php");
+        } catch (PDOException $e) {
+            $errors['database'] = "Error: " . $e->getMessage();
+        }
     }
 }
 
@@ -113,7 +117,7 @@ $persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
 
         .button {
             padding: 10px 20px;
-            background-color: #5bc0de;
+            background-color: #80AD4E;
             color: #fff;
             border: none;
             border-radius: 4px;
@@ -121,14 +125,14 @@ $persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
         .button:hover {
-            background-color: #31b0d5;
+            background-color: #5D7D39;
         }
 
         a {
             display: inline-block;
             margin-top: 20px;
             text-decoration: none;
-            color: #5bc0de;
+            color: #80AD4E;
         }
 
         a:hover {
@@ -139,6 +143,15 @@ $persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
 
 <body>
     <h1>Create Personnel</h1>
+    <?php if (!empty($errors)): ?>
+        <div class="error">
+            <?php foreach ($errors as $error): ?>
+                <p><?php echo htmlspecialchars($error); ?></p>
+            <?php endforeach; ?>
+        </div>
+    <?php elseif (!empty($success)): ?>
+        <div class="success"><?php echo htmlspecialchars($success); ?></div>
+    <?php endif; ?>
     <form action="create_personnel.php" method="post">
         <div class="form-group">
             <label for="personID">Person:</label>

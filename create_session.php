@@ -46,6 +46,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         'address' => $_POST['address']
     ];
 
+    //Check latest team 1 session time
+    // $stmt = $pdo->prepare("SELECT MAX(date) as latestDate, MAX(time) as latestTime FROM Session s JOIN SessionTeams st ON s.sessionID=st.sessionID WHERE st.teamID=?");
+    // $stmt->execute([$_POST['team1ID']]);
+    // $latestT1Session= $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // $stmt->execute([$_POST['team2ID']]);
+    // $latestT2Session= $stmt->fetch(PDO::FETCH_ASSOC);
+
+
+    // $headLocationID = null;
+    // if (!empty($headLocation)) {
+    //     $headLocationID = $headLocation['locationID'];
+    // }
+
     // If no errors, insert data into the database
     if (empty($errors)) {
         try {

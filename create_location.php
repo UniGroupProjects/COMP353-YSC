@@ -14,6 +14,14 @@ $locationData = [
     'capacity' => ''
 ];
 
+$stmt = $pdo->prepare("SELECT * FROM Location WHERE type='Head'");
+$stmt->execute();
+$headLocation = $stmt->fetch(PDO::FETCH_ASSOC);
+$headLocationID = null;
+if (!empty($headLocation)) {
+    $headLocationID = $headLocation['locationID'];
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validation
     if (empty($_POST['name'])) {
@@ -33,6 +41,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (!is_numeric($_POST['capacity']) || intval($_POST['capacity']) < 0) {
         $errors['capacity'] = 'Capacity must be a non-negative integer.';
+    }
+
+    if (!empty($_POST['type'])) {
+        if ($_POST['type'] == 'Head') {
+            if ($headLocationID != null) {
+                $errors['type'] = 'Head location already exists.';
+            }
+        }
     }
 
     // Collect data

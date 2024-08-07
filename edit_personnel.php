@@ -94,8 +94,6 @@ WHERE PP.personnelID = ?");
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-        phpAlert("WTF");
-
         // Validation
         if (empty($_POST['role']) && empty($_POST['hiddenRole'])) {
             $errors['role'] = 'Role is required.';

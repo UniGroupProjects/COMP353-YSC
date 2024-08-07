@@ -1,6 +1,22 @@
 <?php
 include 'config.php';
 
+// Fetch persons for dropdown
+$personStmt = $pdo->query("SELECT personID, CONCAT(firstName, ' ', lastName) AS fullName FROM Person");
+$persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch teams for dropdown
+$teamStmt = $pdo->query("SELECT teamID, locationID, name, gender FROM Team");
+$teams = $teamStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch locations for dropdown
+$locStmt = $pdo->query("SELECT locationID, CONCAT(name, ' : ', address, ' : ', type) AS locName FROM Location");
+$locations = $locStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch family members for dropdown
+$famMemberStmt = $pdo->query("SELECT familyMemberID, CONCAT(firstName, ' ', lastName) AS fullName FROM Person p JOIN FamilyMember fm ON p.personID=fm.personID");
+$famMembers = $famMemberStmt->fetchAll(PDO::FETCH_ASSOC);
+
 $errors = [];
 $clubMemberData = [
     'personID' => null,
@@ -9,7 +25,6 @@ $clubMemberData = [
     'relType' => null,
     'position' => '',
     'teamID' => null,
-    'activationDate' => date('Y-m-d'),
     'locationID' => '',
 ];
 
@@ -39,7 +54,7 @@ if (isset($_GET['id'])) {
 
     //Get personID from clubMemberID
     $personStmt = $pdo->prepare("
-SELECT P.personID, CONCAT(P.firstName, ' ', P.lastName) AS fullName
+SELECT P.personID, P.gender, CONCAT(P.firstName, ' ', P.lastName) AS fullName
 FROM Person P
 JOIN ClubMember PP ON P.personID=PP.personID
 WHERE PP.clubMemberID = ?");
@@ -120,56 +135,104 @@ WHERE s.clubMemberID = :clubMemberID
         'clubMemberID' => $id,
         'position' => $oldPositionID,
         'teamID' => $oldTeamID,
-        'activationDate' => $clubMember['activationDate'],
         'locationID' => $oldLocationID,
         'familyMemberID' => $oldFamilyMemberID,
         'relType' => $oldFamilyMemberRelID,
     ];
 
     if ($_SERVER["REQUEST_METHOD"] == "POST") {
-        $clubMemberID = $_POST['clubMemberID'];
-        $personID = $_POST['personID'];
-        $activationDate = $_POST['activationDate'];
-
         // Validate input
-        if (empty($clubMemberID) || empty($personID) || empty($activationDate)) {
-            $error = "Club Member ID, Person ID, and Activation Date are required.";
-        } else {
-            // Prepare and execute SQL statement
-            $sql = "UPDATE ClubMember SET personID = :personID, activationDate = :activationDate, terminationDate = :terminationDate WHERE clubMemberID = :clubMemberID";
-            $stmt = $pdo->prepare($sql);
 
-            try {
-                $stmt->execute([
-                    ':clubMemberID' => $clubMemberID,
-                    ':personID' => $personID,
-                    ':activationDate' => $activationDate,
-                    ':terminationDate' => null
-                ]);
+        $clubMemberID = $id;
+        $personID = $clubMemberData['personID'];
 
-                $success = "Club member updated successfully!";
-            } catch (PDOException $e) {
-                $error = "Error: " . $e->getMessage();
+        if (!empty($_POST['teamID'])) {
+            //Find team gender
+            $teamGender = '';
+            foreach ($teams as $team) {
+                if ($team['teamID'] == $_POST['teamID']) {
+                    $teamGender = $team['gender'];
+                    break;
+                }
+            }
+
+            //find person gender
+            $personGender = $persons[0]['gender'];
+
+            //make sure they match
+            if ($teamGender != $personGender) {
+                $errors['database'] = "Invalid team gender.";
+            }
+        }
+
+        if (empty($errors)) {
+
+            $pdo->beginTransaction();
+
+            //Update Family member
+            if ($oldFamilyMemberID != $_POST['familyMemberID']) {
+
+                //Invalidate old
+                $sql = "UPDATE Sponsor SET terminationDate=CURDATE() WHERE clubMemberID=? AND familyMemberID=? AND terminationDate is null";
+                $stmt = $pdo->prepare($sql);
+
+                try {
+                    $stmt->execute([
+                        $id,
+                        $oldFamilyMemberID,
+                    ]);
+                } catch (PDOException $e) {
+                    phpAlert($e->getMessage());
+                    $errors['database'] = "Error: " . $e->getMessage();
+                    $pdo->rollBack();
+                    exit;
+                }
+
+                //Then, create the new link if needed
+                if (!empty($_POST['familyMemberID'])) {
+                    $sql = "INSERT INTO Sponsor (clubMemberID, familyMemberID, relType, activationDate, terminationDate) VALUES (?, ?, ?, CURDATE(), null)";
+                    $stmt = $pdo->prepare($sql);
+
+                    try {
+                        $stmt->execute([
+                            $id,
+                            $_POST['familyMemberID'],
+                            $_POST['relType'],
+                        ]);
+                    } catch (PDOException $e) {
+                        phpAlert($e->getMessage());
+                        $errors['database'] = "Error: " . $e->getMessage();
+                        $pdo->rollBack();
+                        exit;
+                    }
+                }
+            } else if ($oldFamilyMemberRelID != $_POST['relType']) {
+                //Diff reltype, same family member
+                $sql = "UPDATE Sponsor SET relType=? WHERE clubMemberID=? AND familyMemberID=? AND terminationDate is null";
+                $stmt = $pdo->prepare($sql);
+
+                try {
+                    $stmt->execute([
+                        $_POST['relType'],
+                        $id,
+                        $oldFamilyMemberID,
+                    ]);
+                } catch (PDOException $e) {
+                    phpAlert($e->getMessage());
+                    $errors['database'] = "Error: " . $e->getMessage();
+                    $pdo->rollBack();
+                    exit;
+                }
+
+            }
+
+            if (empty($errors)) {
+                $pdo->commit();
+                header("Location: index.php");
             }
         }
     }
 }
-
-// Fetch persons for dropdown
-$personStmt = $pdo->query("SELECT personID, CONCAT(firstName, ' ', lastName) AS fullName FROM Person");
-$persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Fetch teams for dropdown
-$personStmt = $pdo->query("SELECT personID, CONCAT(firstName, ' ', lastName) AS fullName FROM Person");
-$persons = $personStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Fetch locations for dropdown
-$locStmt = $pdo->query("SELECT locationID, CONCAT(name, ' : ', address, ' : ', type) AS locName FROM Location");
-$locations = $locStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Fetch family members for dropdown
-$famMemberStmt = $pdo->query("SELECT familyMemberID, CONCAT(firstName, ' ', lastName) AS fullName FROM Person p JOIN FamilyMember fm ON p.personID=fm.personID");
-$famMembers = $famMemberStmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -261,105 +324,114 @@ $famMembers = $famMemberStmt->fetchAll(PDO::FETCH_ASSOC);
 
 <body>
     <h1>Edit Club Member</h1>
-    <?php if (!empty($error)): ?>
-        <div class="error"><?php echo htmlspecialchars($error); ?></div>
+    <?php if (!empty($errors)): ?>
+        <div class="error">
+            <?php foreach ($errors as $error): ?>
+                <p><?php echo htmlspecialchars($error); ?></p>
+            <?php endforeach; ?>
+        </div>
     <?php elseif (!empty($success)): ?>
         <div class="success"><?php echo htmlspecialchars($success); ?></div>
     <?php endif; ?>
-    <?php if (isset($clubMember)): ?>
-        <form action="edit_club_member.php" method="post">
-            <div class="form-group">
-                <label for="familyMemberID">Family Member:</label>
-                <select id="familyMemberID" name="familyMemberID" required>
-                    <option value="">Select a person</option>
-                    <?php foreach ($famMembers as $famMember): ?>
-                        <option value="<?php echo htmlspecialchars($famMember['familyMemberID']); ?>" <?php echo $famMember['familyMemberID'] == $clubMemberData['familyMemberID'] ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($famMember['fullName']); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <span
-                    class="error"><?php echo isset($errors['familyMemberID']) ? htmlspecialchars($errors['familyMemberID']) : ''; ?></span>
-            </div>
+    <form action="edit_club_member.php?id=<?php echo htmlspecialchars($id); ?>" method="post">
+        <div class="form-group">
+            <label for="familyMemberID">Family Member:</label>
+            <select id="familyMemberID" name="familyMemberID" required>
+                <option value="">Select a person</option>
+                <?php foreach ($famMembers as $famMember): ?>
+                    <option value="<?php echo htmlspecialchars($famMember['familyMemberID']); ?>" <?php echo $famMember['familyMemberID'] == $clubMemberData['familyMemberID'] ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($famMember['fullName']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <span
+                class="error"><?php echo isset($errors['familyMemberID']) ? htmlspecialchars($errors['familyMemberID']) : ''; ?></span>
+        </div>
 
-            <div class="form-group">
-                <label for="relType">Relationship Type:</label>
-                <select name="relType" id="relType" required>
-                    <option value="">Select Relationship Type</option>
-                    <option value="Father" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Father' ? 'selected' : ''; ?>>Father
-                    </option>
-                    <option value="Mother" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Mother' ? 'selected' : ''; ?>>Mother
-                    </option>
-                    <option value="GrandFather" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'GrandFather' ? 'selected' : ''; ?>>GrandFather</option>
-                    <option value="GrandMother" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'GrandMother' ? 'selected' : ''; ?>>GrandMother</option>
-                    <option value="Tutor" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Tutor' ? 'selected' : ''; ?>>Tutor
-                    </option>
-                    <option value="Partner" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Partner' ? 'selected' : ''; ?>>Partner
-                    </option>
-                    <option value="Friend" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Friend' ? 'selected' : ''; ?>>Friend
-                    </option>
-                    <option value="Other" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Other' ? 'selected' : ''; ?>>Other
-                    </option>
-                </select>
-                <span
-                    class="error"><?php echo isset($errors['relType']) ? htmlspecialchars($errors['relType']) : ''; ?></span>
-            </div>
+        <div class="form-group">
+            <label for="relType">Relationship Type:</label>
+            <select name="relType" id="relType" required>
+                <option value="">Select Relationship Type</option>
+                <option value="Father" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Father' ? 'selected' : ''; ?>>Father
+                </option>
+                <option value="Mother" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Mother' ? 'selected' : ''; ?>>Mother
+                </option>
+                <option value="GrandFather" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'GrandFather' ? 'selected' : ''; ?>>GrandFather</option>
+                <option value="GrandMother" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'GrandMother' ? 'selected' : ''; ?>>GrandMother</option>
+                <option value="Tutor" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Tutor' ? 'selected' : ''; ?>>Tutor
+                </option>
+                <option value="Partner" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Partner' ? 'selected' : ''; ?>>Partner
+                </option>
+                <option value="Friend" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Friend' ? 'selected' : ''; ?>>Friend
+                </option>
+                <option value="Other" <?php echo isset($clubMemberData['relType']) && $clubMemberData['relType'] === 'Other' ? 'selected' : ''; ?>>Other
+                </option>
+            </select>
+            <span
+                class="error"><?php echo isset($errors['relType']) ? htmlspecialchars($errors['relType']) : ''; ?></span>
+        </div>
 
-            <div class="form-group">
-                <label for="personID">Club Member:</label>
-                <select id="personID" name="personID" required disabled>
-                    <option value="">Select a person</option>
-                    <?php foreach ($persons as $person): ?>
-                        <option value="<?php echo htmlspecialchars($person['personID']); ?>" <?php echo $person['personID'] == $clubMemberData['personID'] ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($person['fullName']); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <span
-                    class="error"><?php echo isset($errors['personID']) ? htmlspecialchars($errors['personID']) : ''; ?></span>
-            </div>
+        <div class="form-group">
+            <label for="personID">Club Member:</label>
+            <select id="personID" name="personID" required disabled>
+                <option value="">Select a person</option>
+                <?php foreach ($persons as $person): ?>
+                    <option value="<?php echo htmlspecialchars($person['personID']); ?>" <?php echo $person['personID'] == $clubMemberData['personID'] ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($person['fullName']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <span
+                class="error"><?php echo isset($errors['personID']) ? htmlspecialchars($errors['personID']) : ''; ?></span>
+        </div>
 
-            <div class="form-group">
-                <label for="locationID">Location:</label>
-                <select id="locationID" name="locationID">
-                    <option value="">Select a location</option>
-                    <?php foreach ($locations as $location): ?>
-                        <option value="<?php echo htmlspecialchars($location['locationID']); ?>" <?php echo $location['locationID'] === $clubMemberData['locationID'] ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($location['locName']); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <span
-                    class="error"><?php echo isset($errors['locationName']) ? htmlspecialchars($errors['locationName']) : ''; ?></span>
-            </div>
+        <div class="form-group">
+            <label for="locationID">Location:</label>
+            <select id="locationID" name="locationID">
+                <option value="">Select a location</option>
+                <?php foreach ($locations as $location): ?>
+                    <option value="<?php echo htmlspecialchars($location['locationID']); ?>" <?php echo $location['locationID'] === $clubMemberData['locationID'] ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($location['locName']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <span
+                class="error"><?php echo isset($errors['locationName']) ? htmlspecialchars($errors['locationName']) : ''; ?></span>
+        </div>
 
 
+        <div class="form-group">
             <label for="teamID">Team:</label>
             <select id="teamID" name="teamID">
                 <option value="">Select a team</option>
+                <?php foreach ($teams as $team): ?>
+                    <option value="<?php echo htmlspecialchars($team['teamID']); ?>" <?php echo $team['teamID'] === $clubMemberData['teamID'] ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($team['name']); ?>
+                    </option>
+                <?php endforeach; ?>
             </select>
+            <span
+                class="error"><?php echo isset($errors['teamName']) ? htmlspecialchars($errors['teamName']) : ''; ?></span>
+        </div>
 
-            <div class="form-group">
-                <label for="position">Position:</label>
-                <select name="position" id="position">
-                    <option value="">Select Position</option>
-                    <option value="Forward" <?php echo isset($position) && $position === 'Forward' ? 'selected' : ''; ?>>
-                        Forward</option>
-                    <option value="Midfielder" <?php echo isset($position) && $position === 'Midfielder' ? 'selected' : ''; ?>>Midfielder</option>
-                    <option value="Defender" <?php echo isset($position) && $position === 'Defender' ? 'selected' : ''; ?>>
-                        Defender</option>
-                    <option value="Goalkeeper" <?php echo isset($position) && $position === 'Goalkeeper' ? 'selected' : ''; ?>>Goalkeeper</option>
-                </select>
-                <span
-                    class="error"><?php echo isset($errors['position']) ? htmlspecialchars($errors['position']) : ''; ?></span>
-            </div>
+        <div class="form-group">
+            <label for="position">Position:</label>
+            <select name="position" id="position">
+                <option value="">Select Position</option>
+                <option value="Forward" <?php echo isset($position) && $position === 'Forward' ? 'selected' : ''; ?>>
+                    Forward</option>
+                <option value="Midfielder" <?php echo isset($position) && $position === 'Midfielder' ? 'selected' : ''; ?>>Midfielder</option>
+                <option value="Defender" <?php echo isset($position) && $position === 'Defender' ? 'selected' : ''; ?>>
+                    Defender</option>
+                <option value="Goalkeeper" <?php echo isset($position) && $position === 'Goalkeeper' ? 'selected' : ''; ?>>Goalkeeper</option>
+            </select>
+            <span
+                class="error"><?php echo isset($errors['position']) ? htmlspecialchars($errors['position']) : ''; ?></span>
+        </div>
 
 
-            <input type="submit" class="button" value="Update Club Member">
-        </form>
-    <?php else: ?>
-        <p>Invalid Club Member ID.</p>
-    <?php endif; ?>
+        <input type="submit" class="button" value="Update Club Member">
+    </form>
     <a href="index.php">Back to List</a>
 
 </body>

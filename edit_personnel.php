@@ -144,7 +144,7 @@ WHERE PP.personnelID = ?");
             if ($_POST['locationID'] != $oldLocationID) {
 
                 //First, terminate the old location
-                $sql = "UPDATE PersonnelLocation SET terminationDate=CURDATE() WHERE personnelID=? AND locationID=?";
+                $sql = "UPDATE PersonnelLocation SET terminationDate=CURDATE() WHERE personnelID=? AND locationID=? AND terminationDate is null";
                 $stmt = $pdo->prepare($sql);
 
                 try {
@@ -199,7 +199,7 @@ WHERE PP.personnelID = ?");
                     if ($isManagerOfCurLoc == true) {
                         //Remove manager link
                         if ($isManagerOfCurLoc) {
-                            $sql = "UPDATE ManagerLocation SET terminationDate=CURDATE() WHERE personnelID=? AND locationID=?";
+                            $sql = "UPDATE ManagerLocation SET terminationDate=CURDATE() WHERE personnelID=? AND locationID=? AND terminationDate is null";
                             $stmt = $pdo->prepare($sql);
 
                             try {

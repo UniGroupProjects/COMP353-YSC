@@ -72,8 +72,8 @@ WHERE
 
     $oldPositionData = $positionStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    if ($oldPositionData && array_key_exists('position', $oldPositionData)) {
-        $oldPositionID = $oldPositionData['position'];
+    if (!empty($oldPositionData)) {
+        $oldPositionID = $oldPositionData[0]['position'];
     } else {
         $oldPositionID = null;
     }
@@ -88,8 +88,8 @@ WHERE
     $teamIDStmt->execute([$id]);
     $oldTeamData = $teamIDStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    if ($oldTeamData && array_key_exists('TeamID', $oldTeamData)) {
-        $oldTeamID = $oldTeamData['TeamID'];
+    if (!empty($oldTeamData)) {
+        $oldTeamID = $oldTeamData[0]['TeamID'];
     } else {
         $oldTeamID = null;
     }
@@ -165,6 +165,24 @@ WHERE s.clubMemberID = :clubMemberID
             }
         }
 
+        if (!empty($_POST['teamID'])) {
+            if (empty($_POST['locationID'])) {
+                $errors['database'] = "Need to select the right location for the team.";
+            }
+
+            $teamLocationID = '';
+            foreach ($teams as $team) {
+                if ($team['teamID'] == $_POST['teamID']) {
+                    $teamLocationID = $team['locationID'];
+                    break;
+                }
+            }
+
+            if ($_POST['locationID'] != $teamLocationID) {
+                $errors['database'] = "Need to select the right location for the team.";
+            }
+        }
+
         if (empty($errors)) {
 
             $pdo->beginTransaction();
@@ -223,7 +241,102 @@ WHERE s.clubMemberID = :clubMemberID
                     $pdo->rollBack();
                     exit;
                 }
+            }
 
+            //Update Location
+            //If the location has changed
+            if ($_POST['locationID'] != $oldLocationID) {
+
+                //First, terminate the old location
+                $sql = "UPDATE ClubMemberLocation SET terminationDate=CURDATE() WHERE clubMemberID=? AND locationID=? AND terminationDate is null";
+                $stmt = $pdo->prepare($sql);
+
+                try {
+                    $stmt->execute([
+                        $id,
+                        $oldLocationID,
+                    ]);
+                } catch (PDOException $e) {
+                    $errors['database'] = "Error: " . $e->getMessage();
+                    $pdo->rollBack();
+                    exit;
+                }
+
+                //Then, create the new link if needed
+                if (!empty($_POST['locationID'])) {
+                    $sql = "INSERT INTO ClubMemberLocation (clubMemberID, locationID, activationDate) VALUES (?, ?, CURDATE())";
+                    $stmt = $pdo->prepare($sql);
+
+                    try {
+                        $stmt->execute([
+                            $id,
+                            $_POST['locationID']
+                        ]);
+                    } catch (PDOException $e) {
+                        $errors['database'] = "Error: " . $e->getMessage();
+                        $pdo->rollBack();
+                        exit;
+                    }
+                }
+
+            }
+
+            //Update Team and Position
+            //If the team has changed
+            if ($_POST['teamID'] != $oldTeamID) {
+
+                //Unassign old team
+                $sql = "DELETE FROM TeamMember WHERE clubMemberID=?";
+                $stmt = $pdo->prepare($sql);
+
+                try {
+                    $stmt->execute([
+                        $id,
+                    ]);
+                } catch (PDOException $e) {
+                    phpAlert($e->getMessage());
+                    $errors['database'] = "Error: " . $e->getMessage();
+                    $pdo->rollBack();
+                    exit;
+                }
+
+                //Add new entry with position if needed
+                if (!empty($_POST['teamID'])) {
+                    $sql = "INSERT INTO TeamMember VALUES (?, ?, ?)";
+                    $stmt = $pdo->prepare($sql);
+
+                    try {
+                        $stmt->execute([
+                            $id,
+                            $_POST['teamID'],
+                            $_POST['position'],
+                        ]);
+                    } catch (PDOException $e) {
+                        phpAlert($e->getMessage());
+                        $errors['database'] = "Error: " . $e->getMessage();
+                        $pdo->rollBack();
+                        exit;
+                    }
+                }
+            }
+            //If the only the position has changed
+            if ($_POST['position'] != $oldPositionID) {
+
+                //Unassign old team
+                $sql = "UPDATE TeamMember SET position=? WHERE clubMemberID=?";
+                $stmt = $pdo->prepare($sql);
+
+                try {
+                    $stmt->execute([
+                        $_POST['position'],
+                        $id,
+                    ]);
+                } catch (PDOException $e) {
+                    phpAlert($e->getMessage());
+                    $errors['database'] = "Error: " . $e->getMessage();
+                    $pdo->rollBack();
+                    exit;
+                }
             }
 
             if (empty($errors)) {
@@ -418,12 +531,12 @@ WHERE s.clubMemberID = :clubMemberID
             <label for="position">Position:</label>
             <select name="position" id="position">
                 <option value="">Select Position</option>
-                <option value="Forward" <?php echo isset($position) && $position === 'Forward' ? 'selected' : ''; ?>>
+                <option value="Forward" <?php echo $clubMemberData['position'] && $clubMemberData['position'] === 'Forward' ? 'selected' : ''; ?>>
                     Forward</option>
-                <option value="Midfielder" <?php echo isset($position) && $position === 'Midfielder' ? 'selected' : ''; ?>>Midfielder</option>
-                <option value="Defender" <?php echo isset($position) && $position === 'Defender' ? 'selected' : ''; ?>>
+                <option value="Midfielder" <?php echo $clubMemberData['position'] && $clubMemberData['position'] === 'Midfielder' ? 'selected' : ''; ?>>Midfielder</option>
+                <option value="Defender" <?php echo $clubMemberData['position'] && $clubMemberData['position'] === 'Defender' ? 'selected' : ''; ?>>
                     Defender</option>
-                <option value="Goalkeeper" <?php echo isset($position) && $position === 'Goalkeeper' ? 'selected' : ''; ?>>Goalkeeper</option>
+                <option value="Goalkeeper" <?php echo $clubMemberData['position'] && $clubMemberData['position'] === 'Goalkeeper' ? 'selected' : ''; ?>>Goalkeeper</option>
             </select>
             <span
                 class="error"><?php echo isset($errors['position']) ? htmlspecialchars($errors['position']) : ''; ?></span>

@@ -1,37 +1,85 @@
 <?php
 include 'config.php';
 
-// Get the family member ID from the query string
-$familyMemberID = $_GET['id'] ?? null;
+$errors = [];
+$familyData = [
+    'personID' => null,
+    'locationID' => null,
+];
 
-if (!$familyMemberID) {
-    die('Family member ID is required.');
-}
+$id = intval($_GET['id']);
 
-// Fetch the existing family member details
-$stmt = $pdo->prepare("SELECT personID FROM FamilyMember WHERE familyMemberID = :familyMemberID");
-$stmt->execute(['familyMemberID' => $familyMemberID]);
-$familyMember = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$familyMember) {
-    die('Family member not found.');
-}
-
-// Fetch all persons from the database
-$stmt = $pdo->query("SELECT personID, CONCAT(firstName, ' ', lastName) AS personName FROM Person");
+// Fetch person
+$stmt = $pdo->query("
+SELECT P.personID, CONCAT(P.firstName, ' ', P.lastName) AS personName
+FROM
+    Person P
+JOIN FamilyMember fm ON P.personID=fm.personID");
 $persons = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Fetch locations for dropdown
+$locStmt = $pdo->query("SELECT locationID, CONCAT(name, ' : ', address, ' : ', type) AS locName FROM Location");
+$locations = $locStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$stmt = $pdo->prepare("SELECT L.locationID, CONCAT(L.name, ' : ', L.address, ' : ', L.type) AS locName
+                    FROM 
+                        FamilyMember P
+                        JOIN FamilyMemberLocation PL on P.familyMemberID = PL.familyMemberID
+                        JOIN Location L on PL.locationID = L.locationID
+                    WHERE P.familyMemberID = ?;");
+$stmt->execute([$id]);
+$oldLocationData = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!empty($oldLocationData)) {
+    $oldLocationID = $oldLocationData['locationID'];
+} else {
+    $oldLocationID = null;
+}
+
+phpAlert($oldLocationID);
+
+$familyData = [
+    'personID' => $persons[0]['personID'],
+    'locationID' => $oldLocationID,
+];
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $newPersonID = $_POST['personID'];
+    //If the location has changed
+    if ($_POST['locationID'] != $oldLocationID) {
 
-    // Update the family member record
-    $stmt = $pdo->prepare("UPDATE FamilyMember SET personID = :personID WHERE familyMemberID = :familyMemberID");
+        $pdo->beginTransaction();
 
-    try {
-        $stmt->execute(['personID' => $newPersonID, 'familyMemberID' => $familyMemberID]);
-        header("Location: index.php");  // Redirect to the main page after insertion
-    } catch (PDOException $e) {
-        $errors['database'] = "Error: " . $e->getMessage();
+        //First, terminate the old location
+        $sql = "UPDATE FamilyMemberLocation SET terminationDate=CURDATE() WHERE familyMemberID=? AND locationID=? AND terminationDate is null";
+        $stmt = $pdo->prepare($sql);
+
+        try {
+            $stmt->execute([
+                $id,
+                $oldLocationID,
+            ]);
+        } catch (PDOException $e) {
+            $errors['database'] = "Error: " . $e->getMessage();
+            $pdo->rollBack();
+            exit;
+        }
+
+        //Then, create the new link if needed
+        if (!empty($_POST['locationID'])) {
+            $sql = "INSERT INTO FamilyMemberLocation (familyMemberID, locationID, activationDate) VALUES (?, ?, CURDATE())";
+            $stmt = $pdo->prepare($sql);
+
+            try {
+                $stmt->execute([
+                    $id,
+                    $_POST['locationID']
+                ]);
+            } catch (PDOException $e) {
+                $errors['database'] = "Error: " . $e->getMessage();
+                $pdo->rollBack();
+                exit;
+            }
+        }
     }
 }
 ?>
@@ -40,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <html>
 
 <head>
-    <title>Edit Family Member</title>
+    <title>Add Family Member</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -54,27 +102,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         form {
-            background-color: #fff;
+            background: #fff;
             padding: 20px;
-            border-radius: 5px;
+            border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: auto;
         }
 
         label {
             display: block;
-            margin: 10px 0 5px;
+            margin-bottom: 8px;
+            font-weight: bold;
         }
 
         input,
         select {
-            width: 100%;
-            padding: 8px;
+            width: calc(100% - 22px);
+            padding: 10px;
             margin-bottom: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
         }
 
-        button {
+        .error {
+            color: #d9534f;
+            font-size: 0.9em;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group span {
+            display: block;
+            margin-top: 5px;
+        }
+
+        .form-group span.error {
+            color: #d9534f;
+        }
+
+        .button {
             padding: 10px 20px;
             background-color: #80AD4E;
             color: #fff;
@@ -83,13 +152,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             cursor: pointer;
         }
 
-        button:hover {
+        .button:hover {
             background-color: #5D7D39;
         }
 
-        .error {
-            color: red;
-            margin-bottom: 10px;
+        a {
+            display: inline-block;
+            margin-top: 20px;
+            text-decoration: none;
+            color: #80AD4E;
+        }
+
+        a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -107,17 +182,35 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <?php endif; ?>
     <form method="POST">
         <label for="personID">Person:</label>
-        <select name="personID" id="personID" required>
+        <select id="personID" name="personID" disabled>
             <option value="">Select a person</option>
             <?php foreach ($persons as $person): ?>
-                <option value="<?php echo htmlspecialchars($person['personID']); ?>" <?php echo ($person['personID'] == $familyMember['personID']) ? 'selected' : ''; ?>>
-                    <?php echo htmlspecialchars($person['fullName']); ?>
+                <option value="<?php echo htmlspecialchars($person['personID']); ?>" <?php echo $person['personID'] === $familyData['personID'] ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars($person['personName']); ?>
                 </option>
             <?php endforeach; ?>
-
         </select>
-        <button type="submit">Update Family Member</button>
+        <span
+            class="error"><?php echo isset($errors['personID']) ? htmlspecialchars($errors['personID']) : ''; ?></span>
+        </div>
+
+        <div class="form-group">
+            <label for="locationID">Location:</label>
+            <select id="locationID" name="locationID">
+                <option value="">Select a location</option>
+                <?php foreach ($locations as $location): ?>
+                    <option value="<?php echo htmlspecialchars($location['locationID']); ?>" <?php echo $location['locationID'] === $familyData['locationID'] ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($location['locName']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <span
+                class="error"><?php echo isset($errors['locationName']) ? htmlspecialchars($errors['locationName']) : ''; ?></span>
+        </div>
+
+        <input type="submit" class="button" value="Edit Family Member">
     </form>
+    <a href="index.php">Back to List</a>
 </body>
 
 </html>

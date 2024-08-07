@@ -46,7 +46,7 @@ if (isset($_GET['id'])) {
     $stmt->execute([$id]);
     $oldLocationData = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($oldLocationData && array_key_exists('locationID', $oldLocationData)) {
+    if (!empty($oldLocationData)) {
         $oldLocationID = $oldLocationData['locationID'];
     } else {
         $oldLocationID = null;
@@ -67,7 +67,7 @@ WHERE
     $stmt->execute([$id]);
     $oldManagerData = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($oldManagerData && array_key_exists('personnelID', $oldManagerData)) {
+    if (!empty($oldManagerData)) {
         $isManagerOfCurLoc = $oldManagerData['personnelID'] == $id;
     } else {
         $isManagerOfCurLoc = false;
@@ -94,6 +94,8 @@ WHERE PP.personnelID = ?");
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
+        phpAlert("WTF");
+
         // Validation
         if (empty($_POST['role']) && empty($_POST['hiddenRole'])) {
             $errors['role'] = 'Role is required.';
@@ -105,13 +107,17 @@ WHERE PP.personnelID = ?");
             $errors['activationDate'] = 'Activation date is required.';
         }
 
+        if (empty($_POST['isManager'])) {
+            $_POST['isManager'] = false;
+        }
+
         // Collect data
         $personnelData = [
             'personID' => $personnelData['personID'],
             'role' => empty($_POST['role']) ? $_POST['hiddenRole'] : $_POST['role'],
             'mandate' => $_POST['mandate'],
             'locationID' => $_POST['locationID'],
-            'isManager' => empty($_POST['isManager']) ? null : $_POST['isManager'],
+            'isManager' => empty($_POST['isManager']) ? false : $_POST['isManager'],
             'activationDate' => $_POST['activationDate'],
         ];
 
@@ -454,7 +460,7 @@ $managers = $managerStmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
         <div class="checkbox-container">
-            <input type="checkbox" id="isManager" name="isManager" class="styled-checkbox">
+            <input type="checkbox" id="isManager" name="isManager" class="styled-checkbox" checked="<?php echo htmlspecialchars($personnelData['isManager']); ?>">
             <label for="isManager" class="checkbox-label">Manager of Location</label>
         </div>
         <span id="managerName" class="manager-name" style="{margin: 15px}"></span>
@@ -483,7 +489,7 @@ $managers = $managerStmt->fetchAll(PDO::FETCH_ASSOC);
             // Find the manager for the selected location
             const manager = managers.find(m => m.locationID == locationID);
 
-            if (manager) {
+            if (manager && !<?php echo $personnelData['isManager'] ?>) {
                 // If a manager exists, hide the checkbox and display the manager's name
                 checkboxContainer.style.display = 'none';
                 managerNameSpan.textContent = 'Current Manager: ' + manager.generalManagerName;

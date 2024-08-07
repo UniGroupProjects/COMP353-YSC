@@ -38,6 +38,40 @@ $stmt = $pdo->query("SELECT ec.familyMemberID, CONCAT(p.firstName, ' ', p.lastNa
                      JOIN Person p ON fm.personID = p.personID");
 $emergencyContacts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Fetch all sessions from the database
+$stmt = $pdo->query("
+SELECT 
+    S.sessionID AS SessionID,
+    S.address AS SessionAddress,
+    S.date AS SessionDate,
+    S.time AS SessionTime,
+    S.type AS SessionType,
+    T1.name AS Team1Name,
+    ST1.score AS Team1Score,
+    T2.name AS Team2Name,
+    ST2.score AS Team2Score
+FROM 
+    Session S
+    LEFT JOIN SessionTeams ST1 ON S.sessionID = ST1.sessionID
+    LEFT JOIN Team T1 ON ST1.teamID = T1.teamID
+    LEFT JOIN SessionTeams ST2 ON S.sessionID = ST2.sessionID AND ST1.teamID <> ST2.teamID
+    LEFT JOIN Team T2 ON ST2.teamID = T2.teamID
+GROUP BY 
+    S.sessionID, S.address, S.date, S.time, S.type;
+
+");
+$sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch all email logs from the database
+$stmt = $pdo->query("
+SELECT 
+    *
+FROM 
+    EmailLogs;
+");
+$emailLogs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
 // Reports
 $stmt = $pdo->query("
 SELECT 
@@ -920,6 +954,87 @@ $report18 = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </table>
         </div>
 
+        <button type="button" class="collapsible">Session List</button>
+        <div class="content">
+            <a href="create_session.php" class="button">Add New Session</a>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Session ID</th>
+                        <th>Address</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Team 1</th>
+                        <th>Team 1 Score</th>
+                        <th>Team 2</th>
+                        <th>Team 2 Score</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if ($sessions): ?>
+                        <?php foreach ($sessions as $session): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($session['SessionID']); ?></td>
+                                <td><?php echo htmlspecialchars($session['SessionAddress']); ?></td>
+                                <td><?php echo htmlspecialchars($session['SessionDate']); ?></td>
+                                <td><?php echo htmlspecialchars($session['SessionTime']); ?></td>
+                                <td><?php echo htmlspecialchars($session['SessionType']); ?></td>
+                                <td><?php echo htmlspecialchars($session['Team1Name']); ?></td>
+                                <td><?php echo htmlspecialchars($session['Team1Score']); ?></td>
+                                <td><?php echo htmlspecialchars($session['Team2Name']); ?></td>
+                                <td><?php echo htmlspecialchars($session['Team2Score']); ?></td>
+                                <td class="actions">
+                                    <a href="delete_session.php?id=<?php echo $session['SessionID']; ?>"
+                                        onclick="return confirm('Are you sure you want to delete this session?');">Delete</a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="10">No records found.</td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <button type="button" class="collapsible">Email Log List</button>
+        <div class="content">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Log ID</th>
+                        <th>Session ID</th>
+                        <th>Date</th>
+                        <th>Sender</th>
+                        <th>Receiver</th>
+                        <th>Subject</th>
+                        <th>Body (Preview)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if ($emailLogs): ?>
+                        <?php foreach ($emailLogs as $log): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($log['logID']); ?></td>
+                                <td><?php echo htmlspecialchars($log['sessionID']); ?></td>
+                                <td><?php echo htmlspecialchars($log['date']); ?></td>
+                                <td><?php echo htmlspecialchars($log['sender']); ?></td>
+                                <td><?php echo htmlspecialchars($log['receiver']); ?></td>
+                                <td><?php echo htmlspecialchars($log['subject']); ?></td>
+                                <td><?php echo htmlspecialchars(substr($log['bodyHead'], 0, 100)); ?>...</td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="8">No records found.</td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
 
 
         <h2>Report</h2>
@@ -952,7 +1067,8 @@ $report18 = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <td><?php echo htmlspecialchars($detail['website']); ?></td>
                                 <td><?php echo htmlspecialchars($detail['type']); ?></td>
                                 <td><?php echo htmlspecialchars($detail['capacity']); ?></td>
-                                <td><?php echo htmlspecialchars((!empty($detail['generalManagerName'])) ? $detail['generalManagerName'] : "N/A"); ?></td>
+                                <td><?php echo htmlspecialchars((!empty($detail['generalManagerName'])) ? $detail['generalManagerName'] : "N/A"); ?>
+                                </td>
                                 <td><?php echo htmlspecialchars($detail['numberOfClubMembers']); ?></td>
                             </tr>
                         <?php endforeach; ?>
@@ -1046,7 +1162,8 @@ $report18 = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <td><?php echo htmlspecialchars($detail['sessionDate']); ?></td>
                                 <td><?php echo htmlspecialchars($detail['sessionType']); ?></td>
                                 <td><?php echo htmlspecialchars($detail['teamName']); ?></td>
-                                <td><?php echo htmlspecialchars((!empty($detail['teamScore'])) ? $detail['teamScore'] : "N/A"); ?></td>
+                                <td><?php echo htmlspecialchars((!empty($detail['teamScore'])) ? $detail['teamScore'] : "N/A"); ?>
+                                </td>
                                 <td><?php echo htmlspecialchars($detail['playerFirstName']); ?></td>
                                 <td><?php echo htmlspecialchars($detail['playerLastName']); ?></td>
                                 <td><?php echo htmlspecialchars($detail['playerRole']); ?></td>
@@ -1231,7 +1348,8 @@ $report18 = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </table>
         </div>
 
-        <button type="button" class="collapsible">Family Members that are also Coaches for the same location as their kid (15)</button>
+        <button type="button" class="collapsible">Family Members that are also Coaches for the same location as their
+            kid (15)</button>
         <div class="content">
             <table>
                 <thead>
@@ -1314,7 +1432,8 @@ $report18 = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <td><?php echo htmlspecialchars($detail['firstName']); ?></td>
                                 <td><?php echo htmlspecialchars($detail['lastName']); ?></td>
                                 <td><?php echo htmlspecialchars($detail['startDate']); ?></td>
-                                <td><?php echo htmlspecialchars((!empty($detail['lastDate'])) ? $detail['lastDate'] : "Current"); ?></td>
+                                <td><?php echo htmlspecialchars((!empty($detail['lastDate'])) ? $detail['lastDate'] : "Current"); ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
